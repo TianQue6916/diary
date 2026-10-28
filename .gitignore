@@ -1,0 +1,9 @@
+# 原始采样与素材快照不公开：
+#   activity/ 是每 10s 的前台窗口原始记录
+#   raw/      是含完整 prompt 原文的结构化素材
+# 只有 days/*.md 与 index.md 是对外的「日记」本体。
+activity/
+raw/
+*.log
+.run.lock
+.git-backup/
