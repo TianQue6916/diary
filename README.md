@@ -87,14 +87,14 @@ python aggregate.py --date 2026-10-27   # 只看素材，不调 LLM
 
 ## GitHub 同步
 
-公开仓库：**https://github.com/TianQue6916/riji**（自己推，每天一次）
+公开仓库：**https://github.com/TianQue6916/diary**（自己推，每天一次）
 
 - 推送由 `run_daily.py` 末尾调 `sync_git.py` 完成，走的 SSH（`~/.ssh/id_ed25519`，已验证免交互）。
 - **只公开** `days/*.md`、`index.md`、`README.md`、`.gitignore`。
   `activity/`（每 10 s 的前台窗口原始记录）与 `raw/`（含完整 prompt 原文的素材快照）
   写在 `.gitignore` 里，永不外传。
 - 离线也不会丢：commit 留在本地，下次运行自动补推，所以最多「晚一天」不会「缺一天」。
-- 想改回私有：`curl -X PATCH -H "Authorization: Bearer $TOK"   https://api.github.com/repos/TianQue6916/riji -d '{"private":true}'`，
+- 想改回私有：`curl -X PATCH -H "Authorization: Bearer $TOK"   https://api.github.com/repos/TianQue6916/diary -d '{"private":true}'`，
   或在网页 Settings 里一键切换。
 
 > 注意：这是公开仓库，日记正文里会出现你的文件路径、窗口标题、你发给 agent 的指令原话。
