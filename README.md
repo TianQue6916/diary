@@ -99,3 +99,55 @@ python aggregate.py --date 2026-10-27   # 只看素材，不调 LLM
 
 > 注意：这是公开仓库，日记正文里会出现你的文件路径、窗口标题、你发给 agent 的指令原话。
 > 这些内容在生成时没有脱敏（脱敏会破坏「可回溯」这个前提）。若哪天不想公开了，转私有即可。
+
+
+## 开机自启：两条路，推荐钩子
+
+这台机器的 shell 跑在 **Low Mandatory Level**，`schtasks` / `reg add` / 写 Startup
+全部 Access denied（PLAN.md 第 948 行）。所以自启必须走「不需要提权」的入口。
+
+### 路 A（推荐，已验证）：dsh 启动钩子
+
+`.dsh/.agent-presets/anchored-standard/journal-hook.mjs`，挂在三个 profile 的
+`cordis.patch.yml` 顶层 `- insert:` 条目上：
+
+```yaml
+- insert:
+    - id: journal-hook
+      name: ../../.agent-presets/anchored-standard/journal-hook.mjs
+      config:
+        enabled: true
+        throttleMs: 3600000
+```
+
+dsh 每次启动 → `apply()` → `spawn(pythonw, sampler.pyw, {detached, stdio:'ignore'})` → unref。
+sampler 是独立进程，**关掉 dsh 不影响它**，23:59 照常触发。
+
+- 幂等：sampler 自己带命名 mutex（`Global\dsh-journal-sampler`），重复 spawn 会自己退出；
+  钩子另有 `throttleMs` 兜住 `patchReload` 反复触发。
+- 静默失败：全程 try/catch，日志写 `journal/hook.log`，**绝不让 dsh boot 挂掉**。
+- 验证方式：`node -e "import('file:///.../journal-hook.mjs').then(m=>m.apply(null,{}))"`
+  然后看 `journal/hook.log` 与新进程 pid。
+- 生效需要**重启一次 dsh**（`.mjs` 不参与 HMR，只有 profile patch 本身是 live）。
+
+### 路 B（双保险）：`一键安装-日记.cmd`，右键以管理员身份运行
+
+纯 cmd 实现（早先的 PowerShell 版有提权+编码问题，已废弃）。装三样：
+`DSH-Journal-Daily`（23:59）、`DSH-Journal-Catchup`（登录后 3 分钟补 7 天）、
+Startup 里的 `dsh-journal-sampler.vbs`。日志 `~/.dsh/logs/journal-install.log`，
+跑完会把日志打在窗口里，失败立刻可见（含「没有管理员权限」的明确提示）。
+
+两条路可以同时开，不会重复跑：sampler 的 mutex 与 `run_daily.py` 的 `.run.lock` 各挡一层。
+
+## 2026-10-30 事故复盘（29/30 断档两天）
+
+根因是**进程生命周期**，不是日记逻辑：
+
+1. sampler 是常驻进程，重启就没了；而自启从未装成（提权那步没人执行）→ 29、30 号整天没有触发源。
+2. 第二个独立故障：`sync_git` 用 MSYS 的 ssh，在 Low IL 下报
+   `NtCreateDirectoryObject(...): 0xC0000022` → **就算日记生成了也推不上去**。
+   已改为 `C:\Windows\System32\OpenSSH\ssh.exe`（系统自带，实测 `Hi TianQue6916!` 通过）。
+3. 第三个逻辑漏洞：白天补跑生成的半截版会被「已存在就跳过」挡住，23:59 不覆盖。
+   `scheduler_tick` 已改为 `--force`，并加了「md 的 mtime 是否过 23:50 才算定稿」的判据。
+
+教训：**「日志能写」和「进程活着」是两件事**，监控缺一个就白干。
