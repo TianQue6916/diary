@@ -1,0 +1,50 @@
+---
+date: 2026-10-28
+weekday: 周三
+generated: 2026-10-28T17:09:15+08:00
+generator: deepseek/deepseek-v4.1-flash
+active_min: 0
+user_prompts: 58
+subagent_dispatches: 131
+tool_calls: 3671
+tool_errors: 113
+autocommits: 21
+llm_tokens: 5625
+---
+# 2026-10-28（周三）
+
+## 一句话
+主线是修 dsh 插件熔断引发的渲染崩溃与升级适配，同时用 learn-translate 批量翻译教材。
+
+## 学习
+今天没有可识别的学习时段。没有 sampler 窗口数据，总活跃记为 0 min；课程线索只出现在派发和文件路径里（EE364a 199 次、信息论 86 次、6.006 40 次、6.042J 16 次、实分析 1 次、CS144 1 次），按规则不能折算成学习时间。
+
+## 建造
+- dsh 插件侧：`profiles/web/cordis.patch.yml`（8 次）、`profiles/desktop/cordis.patch.yml`（7 次）、`profiles/headless/cordis.patch.yml`（2 次）反复改；`profiles/web/package.json`、`profiles/desktop/package.json`、`compatibility.json`、`pnpm-lock.yaml` 跟着动，对应「先升级 linux 那边」到「同步到 windows」这条线。
+- 新增 `.agent-presets/anchored-standard/idle-loop-guard.mjs` 和 `concurrency-discipline.mjs`，对应「32 子 agent 并发」和 loop 空转两个诉求。
+- learn-translate skill 成形：`skills/learn-translate/SKILL.md`、`references/batch-dispatch.md`、`references/format.md`。
+- 翻译产出落盘：`翻译产出/教材/Boyd凸优化/`、`Peterson网络/Peterson网络_p021-040.bilingual.md`、`Convex-Optimization-EE364a/HW3 解答.bilingual.md`。
+- 工具脚本一批：`tools/md2html-lite.py`、`tools/flip-terms.py`、`tools/KaTeX失败清单-20261028.md`、`tools/_patch_prob03_b1.py`/`_b2.py`、`tools/_patch_B1.py`/`_B2.py`/`_B2b.py`、`tools/reports/_audit_eq.py`/`_audit_scan.py`。
+- `PLAN.md` 一天写了 16 次，`storages/skill-usage.json` 14 次，`storages/mnemon-sync-state.json` 7 次；git autocommit 21 次。
+- 16:02 起在 session-5f807f79 搭日记自动化任务，产出 `journal/activity/2026-10-28.jsonl`。
+
+## 卡点
+- 崩溃反复：「还是崩溃」「还是奔溃」「渲染又崩溃了」「全部都崩溃,所有会话」。锁定方向是熔断机制导致渲染崩溃，但一直没闭环。
+- 停摆反复：「为什么又停了?继续啊」「又失败?为什么会被停止无法继续?」「又失败了?」「为什么总是失败?」「卡死了?你怎么没有按照约束,每个命令设置时限?」「又是这样?」
+- 指令没落地：「怎么没用plan工具?」「我说的所有东西你都记住了吗?」「你这些提示词怎么都不带更新的?」「怎么我现在输入一些话,却都不注入上下文了?」
+- 任务串台：「plan这个文件是不是被所有agent任务都用了?混到一块了吧?」；以及「你怎么还翻译上了?做你自己的任务,约束好你自己的子agenr」。
+- 最后给的方向：「唯一解法：开新会话」，`sparseWindow: 0` 是陷阱。
+
+## 明天切口
+1. 在新会话里验证 `enabled: false` / `sparseWindow` 这条结论是否真能止住熔断，别只停在 PLAN.md 里。
+2. 把 `PLAN.md` 拆成每会话独立的任务规划模块，解决 agent 混用。
+3. 给 subagent 加卡死检测和单命令时限，再谈 32 并发。
+
+## 时间分布
+- 窗口停留：素材不足（无 sampler 数据，总活跃 0 min）。
+- 指令两段密集：00:41–04:44，13:38–17:08，之后无记录；共 58 条，另有 131 条 subagent 派发。
+- 工具调用 3671 次，失败 113；bash 2279 / write 693 / read 196 / read_image 171 / edit 109 / subagent 47 / skill_load 47。
+- 浏览器 34 次，集中在 02:14–02:56 和 16:00–16:25，多为 commandcode 用量与账单页。
+
+---
+素材快照：`raw/2026-10-28.json`
