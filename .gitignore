@@ -1,0 +1,12 @@
+# 公开仓库只放 days-public/（脱敏版）。
+# 以下三类是本机原始痕迹，永不外传：
+#   days/      完整日记：真实用户路径、主机名、指令原话
+#   activity/  每 10 s 的前台窗口原始采样
+#   raw/       结构化素材，含完整 prompt 原文
+days/
+activity/
+raw/
+*.log
+.run.lock
+.git-backup/
+.git-backup-*/
