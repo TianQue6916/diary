@@ -138,3 +138,56 @@ _JOURNAL_SYNC_RE = re.compile(r'^journal/activity/[^/]+/[0-9]{4}-[0-9]{2}-[0-9]{
 
 这不是装饰。2026-11-01 的真实数据：`21:41–23:30` 跨 109min，实际窗口只有
 55min（8 段）—— 把两者混成一个数，等于把「挂机」算成工作。
+
+## Linux / GNOME Wayland 怎么拿窗口（社区经验，2026-11-02 查证）
+
+先说结论：**GNOME Wayland 没有官方的 active-window API，唯一可靠途径是 GNOME Shell 扩展 + D-Bus。**
+
+证据链：
+
+- ActivityWatch 作者 Johan Bjäreholt 在 SO 上的原话：Wayland 下拿不到，但
+  *"It is however still possible to access this API via a GNOME Shell extension"*
+- ActivityWatch 论坛维护者给 GNOME-Wayland 用户的建议：用 `awatcher` **+ 一个 GNOME 扩展**
+- `aw-watcher-window-wayland`（Rust）**只支持 wlroots 系**（Hyprland / sway），
+  因为 GNOME 不实现 `wlr-foreign-toplevel-management`
+- 一篇专门做跨 Hyprland/GNOME/KDE 追踪的文章结论一致：
+  *"GNOME on Wayland is the painful one. The only working solution I found is a shell
+  extension called window-calls-extended which exposes a DBus interface"*
+
+### 本机实测走不通的三条路
+
+| 手段 | 结果 |
+|---|---|
+| `xprop -root _NET_ACTIVE_WINDOW` | 返回 `0x600003`，那是 gnome-shell 自己的窗口；`xprop -id` 它拿不到任何属性 |
+| `_NET_CLIENT_LIST` / `wmctrl -l -p` | 全场只有一个 `WPS Office`，原生 Wayland 窗口不在 X 层 |
+| `org.gnome.Shell.Introspect.GetWindows` | `AccessDenied`，GNOME 默认禁 |
+
+### 当前实现：双路径
+
+`sampler_linux.py` 启动时先试 D-Bus（`window-calls-extended`），拿不到就退回 AT-SPI：
+
+```
+模式 = dbus(前台窗口, window-calls-extended)   # 扩展加载后
+模式 = at-spi(可见窗口集合)                      # 兜底，现在跑的这条
+```
+
+两条路写同一种文件，区别只在事件类型：dbus 模式写 `k:"sw"`（和 Windows 一致，是**真前台**），
+AT-SPI 模式写 `k:"vis"`（**可见窗口集合**，不是前台）。aggregate 两种都认，
+A3 段就是 `vis` 的产物，措辞上只能写「打开着」，不能写「一直在看」。
+
+### 已经在 Linux 上装好的
+
+```bash
+~/.local/share/gnome-shell/extensions/window-calls-extended@hseliger.eu/
+# metadata.json 的 shell-version 里补了 "50"（仓库里只写到 49，本机是 GNOME Shell 50.1）
+gsettings set org.gnome.shell enabled-extensions [... 'window-calls-extended@hseliger.eu']
+
+~/.config/systemd/user/dsh-journal-sampler.service   # enabled + active
+```
+
+**扩展需要重新登录一次才加载**（Wayland 下不能热重启 shell）。重登后
+`sampler.log` 的模式行会变成 `dbus(...)`，A3 段自然升级成真前台。
+
+还有一个不上扩展的野路子：在 `Alt+F2` 的 Looking Glass 里 `global.context.unsafe_mode = true`
+之后可以 `org.gnome.Shell.Eval`。**没用它** —— 那等于把整个 shell 的 JS 执行权开放给外部进程，
+比装一个功能单一的扩展危险得多。
