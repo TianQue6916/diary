@@ -221,3 +221,36 @@ focused 拿不到只是这一轮没有切换，不改变模式。
 还有一个不上扩展的野路子：在 `Alt+F2` 的 Looking Glass 里 `global.context.unsafe_mode = true`
 之后可以 `org.gnome.Shell.Eval`。**没用它** —— 那等于把整个 shell 的 JS 执行权开放给外部进程，
 比装一个功能单一的扩展危险得多。
+
+## 时长为什么会「一直是 15 分钟的整数」（2026-11-08 修）
+
+用户反馈日记里的时长全是 5/10/15/20 分钟整。三处独立原因叠在一起：
+
+**① Linux 的离席判定用错了信号。** `IDLE_SKIP = 900` 原本判的是「可见窗口集合
+900 秒没变」。读一篇文档 15 分钟，窗口当然一动不动 —— 于是每一段认真阅读都被
+判成「人走了」切断，段长恰好卡在 15 分钟。
+
+社区正解：`org.gnome.Mutter.IdleMonitor.GetIdletime`，GNOME 在 X11 和 Wayland 上
+都通过 session D-Bus 暴露合成器的**真实输入空闲**（返回 ms）。三份独立实现
+都走这条路：[super-productivity `electron/idle-time-handler.ts`][sp]、
+[EvoMap/evolver `src/gep/idleScheduler.js`][ev]、
+[LunaBox `idle_linux.go`][lb]。KDE Wayland 的
+`org.freedesktop.ScreenSaver.GetSessionIdleTime` 直接返回 NotSupported。
+
+实测：`(uint64 62891,)` → 63 秒，3 秒后 `65919` → 66 秒。可用。
+
+**② 心跳 300 秒决定了段尾精度。** `BEAT = 300` 时，一段「窗口没变」的活动
+只能靠心跳延长尾部，误差就是一个心跳 —— 于是时长被量化成 5 分钟网格。
+两侧都改成 60 秒（一天约 1440 条心跳，~65KB，可忽略）。
+
+**③ `GAP_SWITCH = 15*60` 直接把单段压到 20 分钟。** `capped = min(dur, GAP_SWITCH + BEAT)`
+= 1200 秒，任何长于一节的连续工作都被截断。这个上限原本是给「挂机」兜底的，
+但挂机现在由真实输入空闲判定，不需要它了 —— 放宽到 2 小时，只作极端兜底。
+
+另外修了段尾的最后一截：idle 记录的是「发现已空闲超过阈值」的时刻，人要更早
+就走了。新记录带 `"src": "input"`，aggregate 用 `ts - sec` 回推真实离开时刻。
+老数据没有 `src`（Linux 那时写的是「窗口未变秒数」，语义完全不同），一律不回推。
+
+[sp]: https://github.com/super-productivity/super-productivity/blob/3093ad617319f7ae8063df08a0fb0f63bfdc0847/electron/idle-time-handler.ts
+[ev]: https://github.com/EvoMap/evolver/blob/31b0691acd97ba18878019312e646f1f2d970d43/src/gep/idleScheduler.js
+[lb]: https://github.com/Saramanda9988/LunaBox/blob/97d17b0aa8bedc1aebe0cd3ff87188d67d8c7c3a/packages/backend/utils/timerutils/focusing/idle_linux.go
