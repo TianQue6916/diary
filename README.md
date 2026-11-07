@@ -111,7 +111,22 @@ Tailscale `100.64.0.0/10` 与 `192.168.*` / `10.*` → `<ip:*>`。
 `C:\Windows\System32\OpenSSH\ssh.exe`（MSYS 的 ssh 在 Low IL 下报
 `NtCreateObject 0xC0000022`）。离线不丢：commit 留本地，下次自动补推。
 
-## 双机：数据怎么合到一起
+## 双机：数据怎么合到一起（2026-11-07 改）
+
+**不再依赖 `sync_dsh.py` 的双向同步。** 实测它从 2026-11-02 之后就没跑过，
+而且 Linux 侧那份脚本还是旧版（把 `journal/days/*.md` 也判成该同步）。
+五天里 Windows 一次都没收到 Linux 的采样，日记里自然看不到 Linux。
+
+现在改成 **Windows 侧主动拉**：`pull_remote.py`，`run_daily.py` 每次生成前执行一次
+
+```
+ssh tianque-lan ls .dsh/journal/activity        # 问对端有哪些 host
+scp tianque-lan:.dsh/journal/activity/<h>/*.jsonl  ->  本地 activity/<h>/
+```
+
+单向、幂等、失败只记日志不阻塞。日记的时效性不该押在「有人记得去跑同步脚本」上。
+
+## 旧的同步说明（已被上面的方案取代，保留作历史）
 
 `activity/<host>/YYYY-MM-DD.jsonl` 文件名带 host，两机不会互相覆盖。
 `storages/tools/sync_dsh.py` 曾在 2026-10-31 把 `journal` **整个目录**排除
@@ -185,8 +200,23 @@ gsettings set org.gnome.shell enabled-extensions [... 'window-calls-extended@hse
 ~/.config/systemd/user/dsh-journal-sampler.service   # enabled + active
 ```
 
-**扩展需要重新登录一次才加载**（Wayland 下不能热重启 shell）。重登后
-`sampler.log` 的模式行会变成 `dbus(...)`，A3 段自然升级成真前台。
+**扩展需要重新登录一次才加载**（Wayland 下不能热重启 shell）。
+
+2026-11-07 已确认生效：
+
+```
+linux sampler: 模式 = dbus(前台窗口, window-calls-extended)
+{"k": "sw", "exe": "marktext", "title": "backward-induction-逆向归纳法与最优性原理.md"}
+```
+
+现在 Linux 写的 `k:"sw"` 和 Windows 完全同语义（**真前台**），A3 段只在扩展不可用时才出现。
+
+### 一个判断逻辑的坑
+
+一开始用「能否拿到 focused 窗口」来决定走哪条路，结果用户不在 Linux 前的时候
+所有窗口 `focus:false`，被判成「扩展不可用」一路退回 AT-SPI。
+**可用性判断必须和瞬时状态分开**：现在是 `dbus_available()`（List 能解析出列表就算可用），
+focused 拿不到只是这一轮没有切换，不改变模式。
 
 还有一个不上扩展的野路子：在 `Alt+F2` 的 Looking Glass 里 `global.context.unsafe_mode = true`
 之后可以 `org.gnome.Shell.Eval`。**没用它** —— 那等于把整个 shell 的 JS 执行权开放给外部进程，
