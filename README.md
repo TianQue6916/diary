@@ -254,3 +254,37 @@ focused 拿不到只是这一轮没有切换，不改变模式。
 [sp]: https://github.com/super-productivity/super-productivity/blob/3093ad617319f7ae8063df08a0fb0f63bfdc0847/electron/idle-time-handler.ts
 [ev]: https://github.com/EvoMap/evolver/blob/31b0691acd97ba18878019312e646f1f2d970d43/src/gep/idleScheduler.js
 [lb]: https://github.com/Saramanda9988/LunaBox/blob/97d17b0aa8bedc1aebe0cd3ff87188d67d8c7c3a/packages/backend/utils/timerutils/focusing/idle_linux.go
+
+## 日记重心：从「打开了什么」到「学了什么」（2026-11-08 晚）
+
+用户："日记还是不要太奇怪了,着重突出学习了什么,其他事情可以写得少一点"。
+
+改前是五节模板（一句话/学习/建造/卡点/明天切口/时间分布），读起来像审计报告，
+而且「学习」那一节写的全是「marktext 停在某个文件上」——窗口列表，不是内容。
+
+改后三节，学习占一半以上篇幅：
+
+```
+## 今天学了什么      ← 主体，写主题和内容，不写窗口
+## 顺手做的事        ← 最多 4 行
+## 明天接着
+```
+
+prompt 里直接给了正反例：
+
+- ✗ 「marktext 停在 `backward-induction-逆向归纳法与最优性原理.md`」
+- ✓ 「逆向归纳法与最优性原理：在 marktext 里推进这篇笔记，凌晨和上午两段共 40 分钟」
+
+同时删掉了原来那些「不能证明在前台」「素材不足」的免责声明要求 —— 无关窗口直接不写。
+
+### 同日修掉的三个数据 bug
+
+1. **未闭合段的段尾取了整个文件最后一条记录**（`evs[-1]["ts"]`）。机器中午关机、
+   晚上再开，一个 02:53 的段就被拉到 23:59 → 日记里出现「跨 438min」。
+   改成只用段内的 beat 证明段尾。
+2. **扩展可用性只在启动时判一次**。11:51 机器重启后 GNOME 还没加载完扩展，
+   `dbus_available()` 失败一次就退回 AT-SPI，一整天都只有「可见窗口」。
+   改成不可用时每 2 分钟重试。
+3. **`GetIdletime` 失败被当成「没在 idle」**。gdbus 偶发失败 → 立刻写一条 wake，
+   下一轮又写 idle 6419，一天 32 条假 wake，段被心跳无限续长（7.3 小时）。
+   改成失败时沿用上次读数 + 流逝时间推算，并加一次重试与失败日志。
