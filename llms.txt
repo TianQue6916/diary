@@ -1,0 +1,12 @@
+# diary
+
+> 每晚 23:59 自动生成的中文日记（daily journal）。素材来自 dsh session 全文、tool-call 日志、前台窗口 activity 与 Edge history，归并后交给 LLM 写成 Markdown。给想复刻「被动记录 -> 自动日记」管线的人看。
+
+## Contents
+- [days-public/](days-public/): one YYYY-MM-DD.md per day, 2026-10-25 through 2026-11-08 (15 files)
+- [index.md](index.md): index table, including how each entry was generated
+- [README.md](README.md): 8.5 KB of data flow, three hard-won filtering rules, course detection, LLM fallbacks and rollback
+
+## Notes
+- 18 files, all Markdown; prose in Chinese, code and commands kept verbatim.
+- Private material is filtered before publishing; the public copy is only days-public/.
