@@ -10,3 +10,8 @@ raw/
 .run.lock
 .git-backup/
 .git-backup-*/
+
+# 本机运行时痕迹与 Linux 侧冲突备份（2026-11-11 加）
+.hook-spawn
+.peer-status.json
+*.conflict.*.bak
